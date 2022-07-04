@@ -1,4 +1,17 @@
 import s from './ImageGallery.module.css';
-export default function ImageGalleryItem({ webformatURL }) {
-  return <img src={webformatURL} alt="" className={s.image} />;
+import PropTypes from 'prop-types';
+export default function ImageGalleryItem({ webformatURL, tags, onClickModal }) {
+  return (
+    <img
+      src={webformatURL}
+      alt={tags}
+      className={s.image}
+      onClick={onClickModal}
+    />
+  );
 }
+ImageGalleryItem.propTypes = {
+  webformatURL: PropTypes.string.isRequired,
+  data: PropTypes.string.isRequired,
+  onClickModal: PropTypes.func.isRequired,
+};
