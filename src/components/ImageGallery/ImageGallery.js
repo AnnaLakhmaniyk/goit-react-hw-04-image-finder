@@ -1,10 +1,11 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import ImageGalleryItem from './ImageGalleryItem';
 import Button from 'components/Button/Button';
 import Loader from 'components/Loader/Loader';
 import pixabayApi from 'services/pixabayApi';
 import Modal from 'components/Modal/Modal';
+import PropTypes from 'prop-types';
 import s from './ImageGallery.module.css';
 
 const Status = {
@@ -13,86 +14,81 @@ const Status = {
   RESOLVED: 'resolved',
   REJECTED: 'rejected',
 };
-class ImageGallery extends Component {
-  state = {
-    images: [],
-    showModal: false,
-    page: 1,
-    totalPages: 1,
-    bigImage: ``,
-    error: null,
-    status: Status.IDLE,
-  };
-  componentDidUpdate(prevProps, prevState) {
-    const { imageName } = this.props;
-    const { page } = this.state;
-    if (prevProps.imageName !== imageName || prevState.page !== page) {
-      this.setState({ status: Status.PENDING });
-      pixabayApi
-        .fetchPixabayApi(imageName, page)
-        .then(images => {
-          this.setState({
-            images: images.hits,
-            totalPages: Math.ceil(images.totalHits / 12),
-            status: Status.RESOLVED,
-          });
-          if (!images.hits.length) {
-            this.setState({ images: [], status: Status.REJECTED });
-            toast.error(`Sorry, not found`);
-            return;
-          }
-        })
-        .catch(error => this.setState({ error, status: Status.REJECTED }));
+
+const ImageGallery = ({ imageName, page, onLoadMoreBtn }) => {
+  const [images, setImages] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
+  const [bigImage, setBigImage] = useState('');
+  const [status, setStatus] = useState(Status.IDLE);
+
+  useEffect(() => {
+    if (!imageName) {
+      return;
     }
-  }
-  onLoadMore = () => {
-    this.setState(prevState => {
-      return {
-        page: prevState.page + 1,
-      };
-    });
-  };
-  toggleModal = image => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-      bigImage: image,
-    }));
+    setStatus(Status.PENDING);
+    pixabayApi
+      .fetchPixabayApi(imageName, page)
+      .then(images => {
+        setImages(images.hits);
+        // if (page > 1) {
+        //   setImages(prevState => [...prevState, ...images.hits]);
+        // } else {
+        //   setImages(images.hits);
+        // }
+        setTotalPages(Math.ceil(images.totalHits / 12));
+        setStatus(Status.RESOLVED);
+        if (!images.total) {
+          setImages([]);
+          setStatus(Status.REJECTED);
+          toast.error(`Sorry, not found`);
+          return;
+        }
+      })
+      .catch(error => {
+        console.log(error);
+        setStatus(Status.REJECTED);
+      });
+  }, [imageName, page]);
+
+  const toggleModal = image => {
+    setShowModal(!showModal);
+    setBigImage(image);
   };
 
-  render() {
-    const { images, page, totalPages, status, showModal, bigImage } =
-      this.state;
-    if (status === 'pending') {
-      return <Loader />;
-    }
-    if (status === 'resolved') {
-      return (
-        <>
-          <>
-            {images.length !== 0 && (
-              <ul className={s.imageGallery}>
-                {images.map(({ id, webformatURL, tags, largeImageURL }) => (
-                  <li key={id} className={s.imageGalleryItem}>
-                    <ImageGalleryItem
-                      webformatURL={webformatURL}
-                      tags={tags}
-                      onClickModal={() => this.toggleModal(largeImageURL)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {showModal && (
-              <Modal onClose={this.toggleModal}>
-                <img src={bigImage} alt="" />
-              </Modal>
-            )}
-          </>
-          {page !== totalPages && <Button onLoadMore={this.onLoadMore} />}
-        </>
-      );
-    }
+  if (status === Status.PENDING) {
+    return <Loader />;
   }
-}
+  if (status === Status.RESOLVED) {
+    return (
+      <>
+        {images.length !== 0 && (
+          <ul className={s.imageGallery}>
+            {images.map(({ id, webformatURL, tags, largeImageURL }) => (
+              <li key={id} className={s.imageGalleryItem}>
+                <ImageGalleryItem
+                  webformatURL={webformatURL}
+                  tags={tags}
+                  onClickModal={() => toggleModal(largeImageURL)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        {showModal && (
+          <Modal onClose={toggleModal}>
+            <img src={bigImage} alt="" />
+          </Modal>
+        )}
+        {page !== totalPages && <Button onLoadMore={onLoadMoreBtn} />}
+      </>
+    );
+  }
+};
+ImageGallery.propTypes = {
+  imageName: PropTypes.string.isRequired,
+  page: PropTypes.number.isRequired,
+  onLoadMoreBtn: PropTypes.func.isRequired,
+};
 
 export default ImageGallery;
